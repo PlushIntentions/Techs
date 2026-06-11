@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Technician Chat</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    #chatWindow {
+      height: 65vh;
+      overflow-y: auto;
+      padding: 15px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: 20px;
+    }
+
+    .msg {
+      max-width: 70%;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .sent {
+      background: rgba(15,169,88,0.35);
+      margin-left: auto;
+      border: 1px solid rgba(15,169,88,0.5);
+    }
+
+    .received {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    #inputRow {
+      display: flex;
+      gap: 10px;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- CHAT PANEL -->
+  <div class="glass">
+    <h1 class="accent">Chat Support</h1>
+    <div class="gold-line"></div>
+
+    <p id="statusText" style="opacity: 0.7;">Connecting...</p>
+
+    <div id="chatWindow"></div>
+
+    <div id="inputRow">
+      <input id="messageInput" type="text" placeholder="Type a message...">
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    let techId = null;
+    let techName = null;
+
+    async function initChat() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      techId = session.user.id;
+      techName = session.user.user_metadata.full_name || "Technician";
+
+      document.getElementById("statusText").innerText = "Connected";
+
+      loadMessages();
+      setupRealtime();
+      setupSendButton();
+    }
+
+    async function loadMessages() {
+      const { data: messages } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("tech_id", techId)
+        .order("created_at", { ascending: true });
+
+      renderMessages(messages);
+    }
+
+    function renderMessages(messages) {
+      const chat = document.getElementById("chatWindow");
+      chat.innerHTML = "";
+
+      messages.forEach(msg => {
+        const div = document.createElement("div");
+        div.className = "msg " + (msg.sender_id === techId ? "sent" : "received");
+        div.innerHTML = `
+          <p>${msg.message}</p>
+          <p style="font-size: 11px; opacity: 0.6; margin-top: 4px;">
+            ${new Date(msg.created_at).toLocaleTimeString()}
+          </p>
+        `;
+        chat.appendChild(div);
+      });
+
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function setupRealtime() {
+      supabase
+        .channel("chat_realtime")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_messages",
+            filter: `tech_id=eq.${techId}`
+          },
+          payload => {
+            appendMessage(payload.new);
+          }
+        )
+        .subscribe();
+    }
+
+    function appendMessage(msg) {
+      const chat = document.getElementById("chatWindow");
+
+      const div = document.createElement("div");
+      div.className = "msg " + (msg.sender_id === techId ? "sent" : "received");
+      div.innerHTML = `
+        <p>${msg.message}</p>
+        <p style="font-size: 11px; opacity: 0.6; margin-top: 4px;">
+          ${new Date(msg.created_at).toLocaleTimeString()}
+        </p>
+      `;
+
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function setupSendButton() {
+      const input = document.getElementById("messageInput");
+      const btn = document.getElementById("sendBtn");
+
+      btn.onclick = sendMessage;
+      input.onkeypress = e => {
+        if (e.key === "Enter") sendMessage();
+      };
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("messageInput");
+      const text = input.value.trim();
+
+      if (!text) return;
+
+      await supabase
+        .from("chat_messages")
+        .insert({
+          tech_id: techId,
+          sender_id: techId,
+          sender_name: techName,
+          message: text
+        });
+
+      input.value = "";
+    }
+
+    initChat();
+  </script>
+
+</body>
+</html>
