@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Earnings</title>
+  <link rel="stylesheet" href="technician.css">
+</head>
+
+<body>
+
+  <!-- TOTAL EARNINGS PANEL -->
+  <div class="glass">
+    <h1 class="accent">Earnings Summary</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Total Earnings:</b> <span id="totalEarnings" class="accent">$0.00</span></p>
+    <p><b>Today:</b> <span id="todayEarnings">$0.00</span></p>
+    <p><b>This Week:</b> <span id="weekEarnings">$0.00</span></p>
+    <p><b>This Month:</b> <span id="monthEarnings">$0.00</span></p>
+    <p><b>This Year:</b> <span id="yearEarnings">$0.00</span></p>
+  </div>
+
+  <!-- BREAKDOWN PANEL -->
+  <div class="glass">
+    <h2 class="accent">Earnings Breakdown</h2>
+    <div class="gold-line"></div>
+
+    <p><b>Base Pay:</b> <span id="basePay">$0.00</span></p>
+    <p><b>Add‑Ons:</b> <span id="addons">$0.00</span></p>
+    <p><b>Mileage:</b> <span id="mileage">$0.00</span></p>
+    <p><b>Bonuses:</b> <span id="bonuses">$0.00</span></p>
+  </div>
+
+  <!-- JOB LIST PANEL -->
+  <div class="glass">
+    <h2 class="accent">Completed Jobs</h2>
+    <div class="gold-line"></div>
+
+    <div id="jobList">Loading...</div>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    async function loadEarnings() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch completed jobs
+      const { data: jobs } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("assigned_to", techId)
+        .eq("status", "completed");
+
+      if (!jobs || jobs.length === 0) {
+        document.getElementById("jobList").innerHTML = "<p>No completed jobs yet.</p>";
+        return;
+      }
+
+      // Earnings accumulators
+      let basePay = 0;
+      let addons = 0;
+      let mileage = 0;
+      let bonuses = 0;
+
+      const today = new Date().toDateString();
+      let todayTotal = 0;
+
+      let weekTotal = 0;
+      let monthTotal = 0;
+      let yearTotal = 0;
+
+      const now = new Date();
+      const currentWeek = getWeekNumber(now);
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      // Render job list
+      const container = document.getElementById("jobList");
+      container.innerHTML = "";
+
+      jobs.forEach(job => {
+        const jobDate = new Date(job.completed_at);
+
+        // Earnings math
+        basePay += job.base_pay || 0;
+        addons += job.addons || 0;
+        mileage += job.mileage_pay || 0;
+        bonuses += job.bonus || 0;
+
+        const jobTotal = (job.base_pay || 0) + (job.addons || 0) + (job.mileage_pay || 0) + (job.bonus || 0);
+
+        // Daily
+        if (jobDate.toDateString() === today) {
+          todayTotal += jobTotal;
+        }
+
+        // Weekly
+        if (getWeekNumber(jobDate) === currentWeek) {
+          weekTotal += jobTotal;
+        }
+
+        // Monthly
+        if (jobDate.getMonth() === currentMonth) {
+          monthTotal += jobTotal;
+        }
+
+        // Yearly
+        if (jobDate.getFullYear() === currentYear) {
+          yearTotal += jobTotal;
+        }
+
+        // Render job card
+        const div = document.createElement("div");
+        div.className = "glass";
+        div.style.marginBottom = "12px";
+
+        div.innerHTML = `
+          <h3 class="accent">${job.title}</h3>
+          <p><b>Completed:</b> ${jobDate.toLocaleString()}</p>
+          <p><b>Total Earned:</b> $${jobTotal.toFixed(2)}</p>
+        `;
+
+        container.appendChild(div);
+      });
+
+      // Update UI
+      document.getElementById("basePay").innerText = "$" + basePay.toFixed(2);
+      document.getElementById("addons").innerText = "$" + addons.toFixed(2);
+      document.getElementById("mileage").innerText = "$" + mileage.toFixed(2);
+      document.getElementById("bonuses").innerText = "$" + bonuses.toFixed(2);
+
+      const total = basePay + addons + mileage + bonuses;
+
+      document.getElementById("totalEarnings").innerText = "$" + total.toFixed(2);
+      document.getElementById("todayEarnings").innerText = "$" + todayTotal.toFixed(2);
+      document.getElementById("weekEarnings").innerText = "$" + weekTotal.toFixed(2);
+      document.getElementById("monthEarnings").innerText = "$" + monthTotal.toFixed(2);
+      document.getElementById("yearEarnings").innerText = "$" + yearTotal.toFixed(2);
+    }
+
+    // Helper: get week number
+    function getWeekNumber(date) {
+      const oneJan = new Date(date.getFullYear(), 0, 1);
+      return Math.ceil((((date - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
+    }
+
+    loadEarnings();
+  </script>
+
+</body>
+</html>
