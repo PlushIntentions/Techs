@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Close Work Order</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .preview img {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- CLOSE JOB PANEL -->
+  <div class="glass">
+    <h1 class="accent">Close Work Order</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Job:</b> <span id="jobTitle">Loading...</span></p>
+    <p><b>Address:</b> <span id="jobAddress">Loading...</span></p>
+
+    <!-- FINAL NOTES -->
+    <div style="margin-top: 20px;">
+      <label><b>Final Notes:</b></label>
+      <textarea id="finalNotes" style="
+        width: 100%;
+        height: 150px;
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #fff;
+        resize: none;
+      " placeholder="Describe what was completed..."></textarea>
+    </div>
+
+    <!-- MATERIALS USED -->
+    <div style="margin-top: 20px;">
+      <label><b>Materials Used:</b></label>
+      <textarea id="materialsUsed" style="
+        width: 100%;
+        height: 100px;
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #fff;
+        resize: none;
+      " placeholder="List materials used (if any)..."></textarea>
+    </div>
+
+    <!-- TIME SPENT -->
+    <div style="margin-top: 20px;">
+      <label><b>Time Spent (minutes):</b></label>
+      <input id="timeSpent" type="number" min="1" style="
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #fff;
+      ">
+    </div>
+
+    <!-- FINAL PHOTOS -->
+    <div style="margin-top: 20px;">
+      <label><b>Final Photos:</b></label>
+      <input type="file" id="photoInput" accept="image/*" multiple>
+    </div>
+
+    <div class="preview" id="previewContainer"></div>
+
+    <button id="submitBtn" style="margin-top: 20px;">Submit Close-Out</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    let selectedFiles = [];
+
+    async function loadCloseJob() {
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get("id");
+
+      if (!jobId) {
+        alert("Missing job ID");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch job
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (!job) {
+        alert("Job not found");
+        return;
+      }
+
+      // Fill UI
+      document.getElementById("jobTitle").innerText = job.title;
+      document.getElementById("jobAddress").innerText = job.address;
+
+      setupPhotoInput();
+      setupSubmitButton(jobId, techId);
+    }
+
+    function setupPhotoInput() {
+      const input = document.getElementById("photoInput");
+      const preview = document.getElementById("previewContainer");
+
+      input.onchange = () => {
+        selectedFiles = Array.from(input.files);
+        preview.innerHTML = "";
+
+        selectedFiles.forEach(file => {
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        });
+      };
+    }
+
+    function setupSubmitButton(jobId, techId) {
+      document.getElementById("submitBtn").onclick = async () => {
+        const finalNotes = document.getElementById("finalNotes").value.trim();
+        const materials = document.getElementById("materialsUsed").value.trim();
+        const timeSpent = document.getElementById("timeSpent").value.trim();
+
+        if (!finalNotes) {
+          alert("Please enter final notes.");
+          return;
+        }
+
+        if (!timeSpent || timeSpent <= 0) {
+          alert("Please enter time spent.");
+          return;
+        }
+
+        // Upload final photos
+        for (const file of selectedFiles) {
+          const filePath = `job_${jobId}/final_${Date.now()}_${file.name}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("job-photos")
+            .upload(filePath, file);
+
+          if (uploadError) {
+            alert("Photo upload failed: " + uploadError.message);
+            return;
+          }
+
+          await supabase
+            .from("job_photos")
+            .insert({
+              job_id: jobId,
+              tech_id: techId,
+              file_path: filePath,
+              uploaded_at: new Date().toISOString(),
+              final: true
+            });
+        }
+
+        // Update job record
+        await supabase
+          .from("jobs")
+          .update({
+            status: "completed",
+            final_notes: finalNotes,
+            materials_used: materials,
+            time_spent: timeSpent,
+            completed_at: new Date().toISOString()
+          })
+          .eq("id", jobId);
+
+        alert("Work order successfully closed.");
+
+        // Redirect to dashboard
+        window.location.href = "dashboard.html";
+      };
+    }
+
+    loadCloseJob();
+  </script>
+
+</body>
+</html>
