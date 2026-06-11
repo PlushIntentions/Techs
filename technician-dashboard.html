@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Technician Dashboard</title>
-  <link rel="stylesheet" href="/technician/assets/technician.css">
+  <link rel="stylesheet" href="technician.css">
 
   <!-- Mapbox -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
@@ -48,7 +48,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- TECHNICIAN LOGIC -->
-  <script src="/technician/assets/technician.js"></script>
+  <script src="technician.js"></script>
 
   <!-- PAGE-SPECIFIC LOGIC -->
   <script>
@@ -66,7 +66,7 @@
       map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/dark-v11",
-        center: [-82.18, 41.45], // Lorain OH default
+        center: [-82.18, 41.45],
         zoom: 11
       });
 
@@ -76,7 +76,6 @@
       setupRequestButton(techId);
     }
 
-    // Load assigned + unassigned jobs on map
     async function loadJobsOnMap(techId) {
       const { data: assigned } = await supabase
         .from("jobs")
@@ -88,7 +87,6 @@
         .select("*")
         .is("assigned_to", null);
 
-      // Assigned pins (emerald)
       assigned?.forEach(job => {
         new mapboxgl.Marker({ color: "#0FA958" })
           .setLngLat([job.lng, job.lat])
@@ -96,70 +94,4 @@
           .addTo(map);
       });
 
-      // Unassigned pins (gold)
-      unassigned?.forEach(job => {
-        new mapboxgl.Marker({ color: "#C9A86A" })
-          .setLngLat([job.lng, job.lat])
-          .setPopup(new mapboxgl.Popup().setHTML(`<b>${job.title}</b><br>Available`))
-          .addTo(map);
-      });
-    }
-
-    // Load job counts
-    async function loadCounts(techId) {
-      const { data: assigned } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("assigned_to", techId);
-
-      const { data: unassigned } = await supabase
-        .from("jobs")
-        .select("*")
-        .is("assigned_to", null);
-
-      document.getElementById("assignedCount").innerText =
-        "Assigned Jobs: " + (assigned?.length || 0);
-
-      document.getElementById("unassignedCount").innerText =
-        "Available Jobs: " + (unassigned?.length || 0);
-    }
-
-    // Dispatch sign in/out
-    async function setupDispatchButton(techId) {
-      const btn = document.getElementById("dispatchBtn");
-
-      btn.onclick = async () => {
-        const { data: status } = await supabase
-          .from("dispatch_status")
-          .select("*")
-          .eq("tech_id", techId)
-          .single();
-
-        if (!status || status.active === false) {
-          await supabase.from("dispatch_status").upsert({
-            tech_id: techId,
-            active: true
-          });
-          btn.innerText = "Sign Out of Dispatch";
-        } else {
-          await supabase.from("dispatch_status").upsert({
-            tech_id: techId,
-            active: false
-          });
-          btn.innerText = "Sign In to Dispatch";
-        }
-      };
-    }
-
-    // Request work order
-    function setupRequestButton(techId) {
-      document.getElementById("requestBtn").onclick = () => {
-        window.location.href = "jobs.html"; // goes to work order page
-      };
-    }
-
-    initDashboard();
-  </script>
-
-</body>
-</html>
+      unassigned
