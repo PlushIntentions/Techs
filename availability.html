@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Availability</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .day-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .day-row select, .day-row input[type=time] {
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      width: 120px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- AVAILABILITY PANEL -->
+  <div class="glass">
+    <h1 class="accent">Weekly Availability</h1>
+    <div class="gold-line"></div>
+
+    <p>Set the days and times you are available for dispatch.</p>
+
+    <div id="availabilityContainer"></div>
+
+    <button id="saveBtn" style="margin-top: 20px;">Save Availability</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    const days = [
+      "Monday", "Tuesday", "Wednesday",
+      "Thursday", "Friday", "Saturday", "Sunday"
+    ];
+
+    async function loadAvailability() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch availability
+      const { data: availability } = await supabase
+        .from("technician_availability")
+        .select("*")
+        .eq("tech_id", techId)
+        .single();
+
+      const container = document.getElementById("availabilityContainer");
+      container.innerHTML = "";
+
+      days.forEach(day => {
+        const row = document.createElement("div");
+        row.className = "day-row";
+
+        const dayKey = day.toLowerCase();
+
+        const isAvailable = availability?.[`${dayKey}_available`] || false;
+        const start = availability?.[`${dayKey}_start`] || "";
+        const end = availability?.[`${dayKey}_end`] || "";
+
+        row.innerHTML = `
+          <span><b>${day}</b></span>
+
+          <select id="${dayKey}_available">
+            <option value="true" ${isAvailable ? "selected" : ""}>Available</option>
+            <option value="false" ${!isAvailable ? "selected" : ""}>Not Available</option>
+          </select>
+
+          <input type="time" id="${dayKey}_start" value="${start}">
+          <input type="time" id="${dayKey}_end" value="${end}">
+        `;
+
+        container.appendChild(row);
+      });
+
+      setupSaveButton(techId);
+    }
+
+    function setupSaveButton(techId) {
+      document.getElementById("saveBtn").onclick = async () => {
+        const updates = { tech_id: techId };
+
+        days.forEach(day => {
+          const key = day.toLowerCase();
+
+          updates[`${key}_available`] =
+            document.getElementById(`${key}_available`).value === "true";
+
+          updates[`${key}_start`] =
+            document.getElementById(`${key}_start`).value;
+
+          updates[`${key}_end`] =
+            document.getElementById(`${key}_end`).value;
+        });
+
+        await supabase
+          .from("technician_availability")
+          .upsert(updates);
+
+        alert("Availability saved successfully.");
+      };
+    }
+
+    loadAvailability();
+  </script>
+
+</body>
+</html>
