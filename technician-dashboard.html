@@ -1,25 +1,165 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Technician Dashboard</title>
   <link rel="stylesheet" href="/technician/assets/technician.css">
+
+  <!-- Mapbox -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+  <style>
+    #map {
+      width: 100%;
+      height: 400px;
+      border-radius: 18px;
+      margin-bottom: 20px;
+    }
+  </style>
 </head>
 
 <body>
 
+  <!-- MAP PANEL -->
   <div class="glass">
-    <h1 class="accent">Technician Dashboard</h1>
+    <h1 class="accent">Nearby Work Orders</h1>
     <div class="gold-line"></div>
-
-    <a href="jobs.html"><button>View Jobs</button></a>
-    <a href="settings.html"><button>Settings</button></a>
+    <div id="map"></div>
   </div>
 
-  <!-- Load Supabase (same as admin) -->
+  <!-- ACTIONS PANEL -->
+  <div class="glass">
+    <h2 class="accent">Actions</h2>
+    <div class="gold-line"></div>
+
+    <button id="requestBtn">Request Work Order</button>
+    <button id="dispatchBtn">Sign In to Dispatch</button>
+  </div>
+
+  <!-- JOB COUNTS PANEL -->
+  <div class="glass">
+    <h2 class="accent">Your Jobs</h2>
+    <div class="gold-line"></div>
+
+    <p id="assignedCount">Assigned Jobs: Loading...</p>
+    <p id="unassignedCount">Available Jobs: Loading...</p>
+  </div>
+
+  <!-- SUPABASE (same as admin dashboard) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Technician logic -->
+  <!-- TECHNICIAN LOGIC -->
   <script src="/technician/assets/technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    mapboxgl.accessToken = "YOUR_MAPBOX_TOKEN";
+
+    let map;
+
+    async function initDashboard() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Load map
+      map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: [-82.18, 41.45], // Lorain OH default
+        zoom: 11
+      });
+
+      loadJobsOnMap(techId);
+      loadCounts(techId);
+      setupDispatchButton(techId);
+      setupRequestButton(techId);
+    }
+
+    // Load assigned + unassigned jobs on map
+    async function loadJobsOnMap(techId) {
+      const { data: assigned } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("assigned_to", techId);
+
+      const { data: unassigned } = await supabase
+        .from("jobs")
+        .select("*")
+        .is("assigned_to", null);
+
+      // Assigned pins (emerald)
+      assigned?.forEach(job => {
+        new mapboxgl.Marker({ color: "#0FA958" })
+          .setLngLat([job.lng, job.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(`<b>${job.title}</b><br>Assigned to you`))
+          .addTo(map);
+      });
+
+      // Unassigned pins (gold)
+      unassigned?.forEach(job => {
+        new mapboxgl.Marker({ color: "#C9A86A" })
+          .setLngLat([job.lng, job.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(`<b>${job.title}</b><br>Available`))
+          .addTo(map);
+      });
+    }
+
+    // Load job counts
+    async function loadCounts(techId) {
+      const { data: assigned } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("assigned_to", techId);
+
+      const { data: unassigned } = await supabase
+        .from("jobs")
+        .select("*")
+        .is("assigned_to", null);
+
+      document.getElementById("assignedCount").innerText =
+        "Assigned Jobs: " + (assigned?.length || 0);
+
+      document.getElementById("unassignedCount").innerText =
+        "Available Jobs: " + (unassigned?.length || 0);
+    }
+
+    // Dispatch sign in/out
+    async function setupDispatchButton(techId) {
+      const btn = document.getElementById("dispatchBtn");
+
+      btn.onclick = async () => {
+        const { data: status } = await supabase
+          .from("dispatch_status")
+          .select("*")
+          .eq("tech_id", techId)
+          .single();
+
+        if (!status || status.active === false) {
+          await supabase.from("dispatch_status").upsert({
+            tech_id: techId,
+            active: true
+          });
+          btn.innerText = "Sign Out of Dispatch";
+        } else {
+          await supabase.from("dispatch_status").upsert({
+            tech_id: techId,
+            active: false
+          });
+          btn.innerText = "Sign In to Dispatch";
+        }
+      };
+    }
+
+    // Request work order
+    function setupRequestButton(techId) {
+      document.getElementById("requestBtn").onclick = () => {
+        window.location.href = "jobs.html"; // goes to work order page
+      };
+    }
+
+    initDashboard();
+  </script>
 
 </body>
 </html>
