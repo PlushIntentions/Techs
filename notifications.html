@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Notifications</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .notif {
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .notif.unread {
+      border-left: 4px solid #C9A86A;
+      background: rgba(255,255,255,0.12);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NOTIFICATIONS PANEL -->
+  <div class="glass">
+    <h1 class="accent">Notifications</h1>
+    <div class="gold-line"></div>
+
+    <button id="clearBtn" style="margin-bottom: 20px;">Clear All</button>
+
+    <div id="notifList">Loading...</div>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
