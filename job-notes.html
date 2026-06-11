@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Job Notes</title>
+  <link rel="stylesheet" href="technician.css">
+</head>
+
+<body>
+
+  <!-- NOTES PANEL -->
+  <div class="glass">
+    <h1 class="accent">Job Notes</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Job:</b> <span id="jobTitle">Loading...</span></p>
+    <p><b>Address:</b> <span id="jobAddress">Loading...</span></p>
+
+    <div style="margin-top: 20px;">
+      <label><b>Notes:</b></label>
+      <textarea id="notesInput" style="
+        width: 100%;
+        height: 150px;
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #fff;
+        resize: none;
+      " placeholder="Enter job notes here..."></textarea>
+    </div>
+
+    <button id="saveBtn" style="margin-top: 20px;">Save Notes</button>
+    <button id="nextBtn" style="margin-top: 10px;">Continue to Photos</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    async function loadJobNotes() {
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get("id");
+
+      if (!jobId) {
+        alert("Missing job ID");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch job
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (!job) {
+        alert("Job not found");
+        return;
+      }
+
+      // Fill UI
+      document.getElementById("jobTitle").innerText = job.title;
+      document.getElementById("jobAddress").innerText = job.address;
+
+      // Load existing notes
+      const { data: notes } = await supabase
+        .from("job_notes")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("tech_id", techId)
+        .single();
+
+      if (notes) {
+        document.getElementById("notesInput").value = notes.content;
+      }
+
+      setupButtons(jobId, techId);
+    }
+
+    function setupButtons(jobId, techId) {
+      // Save notes
+      document.getElementById("saveBtn").onclick = async () => {
+        const content = document.getElementById("notesInput").value.trim();
+
+        await supabase
+          .from("job_notes")
+          .upsert({
+            job_id: jobId,
+            tech_id: techId,
+            content,
+            updated_at: new Date().toISOString()
+          });
+
+        alert("Notes saved successfully.");
+      };
+
+      // Continue to photos
+      document.get
