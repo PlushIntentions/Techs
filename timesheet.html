@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Timesheet</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .entry {
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TIMESHEET SUMMARY -->
+  <div class="glass">
+    <h1 class="accent">Timesheet</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Today:</b> <span id="todayHours" class="accent">0h 00m</span></p>
+    <p><b>This Week:</b> <span id="weekHours">0h 00m</span></p>
+    <p><b>This Month:</b> <span id="monthHours">0h 00m</span></p>
+
+    <button id="clockInBtn" style="margin-top: 20px;">Clock In</button>
+    <button id="clockOutBtn" style="margin-top: 10px; display:none;">Clock Out</button>
+  </div>
+
+  <!-- TIMESHEET HISTORY -->
+  <div class="glass">
+    <h2 class="accent">Work Sessions</h2>
+    <div class="gold-line"></div>
+
+    <div id="sessionList">Loading...</div>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    let techId = null;
+
+    async function loadTimesheet() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      techId = session.user.id;
+
+      loadSummary();
+      loadSessions();
+      checkClockStatus();
+      setupButtons();
+    }
+
+    async function loadSummary() {
+      const { data: sessions } = await supabase
+        .from("timesheet")
+        .select("*")
+        .eq("tech_id", techId);
+
+      if (!sessions) return;
+
+      let today = 0;
+      let week = 0;
+      let month = 0;
+
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const currentWeek = getWeekNumber(now);
+      const currentMonth = now.getMonth();
+
+      sessions.forEach(s => {
+        if (!s.clock_out) return;
+
+        const start = new Date(s.clock_in);
+        const end = new Date(s.clock_out);
+        const diff = (end - start) / 1000 / 60 / 60;
+
+        if (start.toDateString() === todayStr) today += diff;
+        if (getWeekNumber(start) === currentWeek) week += diff;
+        if (start.getMonth() === currentMonth) month += diff;
+      });
+
+      document.getElementById("todayHours").innerText = formatHours(today);
+      document.getElementById("weekHours").innerText = formatHours(week);
+      document.getElementById("monthHours").innerText = formatHours(month);
+    }
+
+    async function loadSessions() {
+      const { data: sessions } = await supabase
+        .from("timesheet")
+        .select("*")
+        .eq("tech_id", techId)
+        .order("clock_in", { ascending: false });
+
+      const container = document.getElementById("sessionList");
+      container.innerHTML = "";
+
+      if (!sessions || sessions.length === 0) {
+        container.innerHTML = "<p>No timesheet entries yet.</p>";
+        return;
+      }
+
+      sessions.forEach(s => {
+        const div = document.createElement("div");
+        div.className = "entry";
+
+        const start = new Date(s.clock_in);
+        const end = s.clock_out ? new Date(s.clock_out) : null;
+
+        const duration = end ? formatHours((end - start) / 1000 / 60 / 60) : "In Progress";
+
+        div.innerHTML = `
+          <p><b>Date:</b> ${start.toDateString()}</p>
+          <p><b>Clock In:</b> ${start.toLocaleTimeString()}</p>
+          <p><b>Clock Out:</b> ${end ? end.toLocaleTimeString() : "—"}</p>
+          <p><b>Hours:</b> ${duration}</p>
+        `;
+
+        container.appendChild(div);
+      });
+    }
+
+    async function checkClockStatus() {
+      const { data: active } = await supabase
+        .from("timesheet")
+        .select("*")
+        .eq("tech_id", techId)
+        .is("clock_out", null)
+        .maybeSingle();
+
+      if (active) {
+        document.getElementById("clockInBtn").style.display = "none";
+        document.getElementById("clockOutBtn").style.display = "block";
+      } else {
+        document.getElementById("clockInBtn").style.display = "block";
+        document.getElementById("clockOutBtn").style.display = "none";
+      }
+    }
+
+    function setupButtons() {
+      document.getElementById("clockInBtn").onclick = async () => {
+        await supabase
+          .from("timesheet")
+          .insert({
+            tech_id: techId,
+            clock_in: new Date().toISOString()
+          });
+
+        loadTimesheet();
+      };
+
+      document.getElementById("clockOutBtn").onclick = async () => {
+        const { data: active } = await supabase
+          .from("timesheet")
+          .select("*")
+          .eq("tech_id", techId)
+          .is("clock_out", null)
+          .single();
+
+        if (!active) return;
+
+        await supabase
+          .from("timesheet")
+          .update({
+            clock_out: new Date().toISOString()
+          })
+          .eq("id", active.id);
+
+        loadTimesheet();
+      };
+    }
+
+    function formatHours(hours) {
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      return `${h}h ${m}m`;
+    }
+
+    function getWeekNumber(date) {
+      const oneJan = new Date(date.getFullYear(), 0, 1);
+      return Math.ceil((((date - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
+    }
+
+    loadTimesheet();
+  </script>
+
+</body>
+</html>
