@@ -1,0 +1,42 @@
+/* Background */
+body {
+  background: linear-gradient(135deg, #0B0F0E, #1A1F1D);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Glass Panels */
+.glass {
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 20px;
+}
+
+/* Wealth Accent (Emerald Green) */
+.accent {
+  color: #0FA958;
+}
+
+button {
+  background: linear-gradient(135deg, #0FA958, #0C8A48);
+  border: none;
+  padding: 12px 18px;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #11C86A, #0FA958);
+  transform: translateY(-2px);
+}
+
+/* Gold Micro Accents */
+.gold-line {
+  border-bottom: 2px solid rgba(201, 168, 106, 0.4);
+}
