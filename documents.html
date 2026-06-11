@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Documents</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .doc-card {
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .doc-preview {
+      width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- DOCUMENTS PANEL -->
+  <div class="glass">
+    <h1 class="accent">Your Documents</h1>
+    <div class="gold-line"></div>
+
+    <p>Upload and manage your required documents.</p>
+
+    <div id="documentsContainer">Loading...</div>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    const docTypes = [
+      { key: "w9_url", label: "W‑9 Form" },
+      { key: "id_url", label: "Driver’s License / State ID" },
+      { key: "certs_url", label: "Certifications" },
+      { key: "insurance_url", label: "Insurance (Optional)" }
+    ];
+
+    let techId = null;
+    let profile = null;
+
+    async function loadDocuments() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      techId = session.user.id;
+
+      // Load technician profile
+      const { data } = await supabase
+        .from("technicians")
+        .select("*")
+        .eq("id", techId)
+        .single();
+
+      profile = data;
+
+      renderDocumentCards();
+    }
+
+    function renderDocumentCards() {
