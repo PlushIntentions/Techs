@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Work Order Details</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <!-- Mapbox -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+  <style>
+    #map {
+      width: 100%;
+      height: 300px;
+      border-radius: 18px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- JOB DETAILS PANEL -->
+  <div class="glass">
+    <h1 class="accent" id="jobTitle">Loading...</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Address:</b> <span id="jobAddress">Loading...</span></p>
+    <p><b>Status:</b> <span id="jobStatus">Loading...</span></p>
+    <p><b>Scheduled:</b> <span id="jobDate">Loading...</span></p>
+    <p><b>Description:</b></p>
+    <p id="jobDescription">Loading...</p>
+
+    <div id="map"></div>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div class="glass">
+    <h2 class="accent">Actions</h2>
+    <div class="gold-line"></div>
+
+    <button id="claimBtn" style="display:none;">Claim Work Order</button>
+    <button id="startBtn" style="display:none;">Start Job</button>
+    <button id="notesBtn" style="display:none;">Add Notes</button>
+    <button id="photosBtn" style="display:none;">Upload Photos</button>
+    <button id="closeBtn" style="display:none;">Close Job</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    mapboxgl.accessToken = "YOUR_MAPBOX_TOKEN";
+
+    async function loadJobDetails() {
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get("id");
+
+      if (!jobId) {
+        alert("Missing job ID");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch job
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (!job) {
+        alert("Job not found");
+        return;
+      }
+
+      // Fill UI
+      document.getElementById("jobTitle").innerText = job.title;
+      document.getElementById("jobAddress").innerText = job.address;
+      document.getElementById("jobStatus").innerText = job.status;
+      document.getElementById("jobDate").innerText = job.scheduled_date || "Not Scheduled";
+      document.getElementById("jobDescription").innerText = job.description || "No description provided.";
+
+      // Load map
+      const map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: [job.lng, job.lat],
+        zoom: 13
+      });
+
+      new mapboxgl.Marker({ color: "#0FA958" })
+        .setLngLat([job.lng, job.lat])
+        .addTo(map);
+
+      // Show correct buttons
+      if (!job.assigned_to) {
+        document.getElementById("claimBtn").style.display = "inline-block";
+      } else if (job.assigned_to === techId) {
+        document.getElementById("startBtn").style.display = "inline-block";
+        document.getElementById("notesBtn").style.display = "inline-block";
+        document.getElementById("photosBtn").style.display = "inline-block";
+        document.getElementById("closeBtn").style.display = "inline-block";
+      }
+
+      setupActions(jobId, techId);
+    }
+
+    function setupActions(jobId, techId) {
+      // Claim job
+      document.getElementById("claimBtn").onclick = async () => {
+        await supabase
+          .from("jobs")
+          .update({ assigned_to: techId, status: "assigned" })
+          .eq("id", jobId);
+
+        window.location.reload();
+      };
+
+      // Start job
+      document.getElementById("startBtn").onclick = () => {
+        window.location.href = "start-job.html?id=" + jobId;
+      };
+
+      // Notes
+      document.getElementById("notesBtn").onclick = () => {
+        window.location.href = "job-notes.html?id=" + jobId;
+      };
+
+      // Photos
+      document.getElementById("photosBtn").onclick = () => {
+        window.location.href = "job-photos.html?id=" + jobId;
+      };
+
+      // Close job
+      document.getElementById("closeBtn").onclick = () => {
+        window.location.href = "close-job.html?id=" + jobId;
+      };
+    }
+
+    loadJobDetails();
+  </script>
+
+</body>
+</html>
