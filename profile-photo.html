@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Update Profile Photo</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    #preview {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255,255,255,0.2);
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- PROFILE PHOTO PANEL -->
+  <div class="glass">
+    <h1 class="accent">Profile Photo</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Name:</b> <span id="techName">Loading...</span></p>
+    <p><b>Email:</b> <span id="techEmail">Loading...</span></p>
+
+    <img id="preview" src="" alt="Profile Photo">
+
+    <div style="margin-top: 20px;">
+      <label><b>Select New Photo:</b></label>
+      <input type="file" id="photoInput" accept="image/*">
+    </div>
+
+    <button id="uploadBtn" style="margin-top: 20px;">Upload Photo</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    let selectedFile = null;
+
+    async function loadProfilePhoto() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fill basic info
+      document.getElementById("techName").innerText =
+        session.user.user_metadata.full_name || "Technician";
+
+      document.getElementById("techEmail").innerText = session.user.email;
+
+      // Load profile from technicians table
+      const { data: profile } = await supabase
+        .from("technicians")
+        .select("*")
+        .eq("id", techId)
+        .single();
+
+      if (profile && profile.profile_photo_url) {
+        document.getElementById("preview").src = profile.profile_photo_url;
+      } else {
+        document.getElementById("preview").src =
+          "https://placehold.co/160x160/0FA958/FFFFFF?text=No+Photo";
+      }
+
+      setupPhotoInput();
+      setupUploadButton(techId);
+    }
+
+    function setupPhotoInput() {
+      const input = document.getElementById("photoInput");
+      const preview = document.getElementById("preview");
+
+      input.onchange = () => {
+        selectedFile = input.files[0];
+        if (selectedFile) {
+          preview.src = URL.createObjectURL(selectedFile);
+        }
+      };
+    }
+
+    function setupUploadButton(techId) {
+      document.getElementById("uploadBtn").onclick = async () => {
+        if (!selectedFile) {
+          alert("Please select a photo.");
+          return;
+        }
+
+        const filePath = `tech_${techId}/${Date.now()}_${selectedFile.name}`;
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from("profile_photo")
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          alert("Upload failed: " + uploadError.message);
+          return;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("profile_photo")
+          .getPublicUrl(filePath);
+
+        const photoUrl = urlData.publicUrl;
+
+        // Update technicians table
+        await supabase
+          .from("technicians")
+          .update({ profile_photo_url: photoUrl })
+          .eq("id", techId);
+
+        // Update Supabase Auth metadata
+        await supabase.auth.updateUser({
+          data: { profile_photo_url: photoUrl }
+        });
+
+        alert("Profile photo updated successfully.");
+
+        window.location.reload();
+      };
+    }
+
+    loadProfilePhoto();
+  </script>
+
+</body>
+</html>
