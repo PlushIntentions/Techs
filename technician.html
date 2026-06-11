@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Technician Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/technician.css">
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Loader -->
+  <div id="loader">
+    <img src="logo.png" class="loader-logo" alt="Logo">
+    <div class="loader-text">Loading Technician Portal</div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Sidebar backdrop (mobile) -->
+  <div class="sidebar-backdrop"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar glass">
+    <div class="sidebar-header">
+      <div class="brand">
+        <img src="logo.png" alt="Logo">
+        <div>
+          <div class="brand-title">Plush Intentions</div>
+          <div class="brand-sub">Technician</div>
+        </div>
+      </div>
+      <button class="sidebar-close-btn" aria-label="Close sidebar">
+        ✕
+      </button>
+    </div>
+
+    <div class="sidebar-stats">
+      <div class="ss-card pink">
+        <div class="val" id="stat-open-wos">0</div>
+        <div class="lbl">Open WOs</div>
+      </div>
+      <div class="ss-card green">
+        <div class="val" id="stat-today">0</div>
+        <div class="lbl">Today</div>
+      </div>
+    </div>
+
+    <div class="nav-section">Navigation</div>
+    <nav>
+      <div class="nav-link active" data-panel="panel-dashboard">
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-link" data-panel="panel-workorders">
+        <span>Work Orders</span>
+      </div>
+      <div class="nav-link" data-panel="panel-documents">
+        <span>Documents</span>
+      </div>
+      <div class="nav-link" data-panel="panel-chat">
+        <span>Chat</span>
+      </div>
+      <div class="nav-link" data-panel="panel-availability">
+        <span>Availability</span>
+      </div>
+      <div class="nav-link" data-panel="panel-timesheet">
+        <span>Timesheet</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="signed-in-email"></div>
+      <button class="btn-signout">
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <main class="main-area">
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="hamburger" aria-label="Open sidebar">
+        ☰
+      </button>
+      <div class="topbar-title">Technician Portal</div>
+      <button class="topbar-refresh" id="btn-refresh" aria-label="Refresh">
+        ⟳
+      </button>
+    </header>
+
+    <!-- Mobile stats -->
+    <div class="mobile-stats-bar">
+      <div class="msb-card">
+        <div class="msb-val" id="msb-open-wos">0</div>
+        <div class="msb-lbl">Open WOs</div>
+      </div>
+      <div class="msb-card">
+        <div class="msb-val" id="msb-today">0</div>
+        <div class="msb-lbl">Today</div>
+      </div>
+    </div>
+
+    <!-- Panels -->
+    <section class="panel active" id="panel-dashboard">
+      <div class="panel-header">
+        <h2>Dashboard</h2>
+      </div>
+      <div class="section-heading">Assigned Work Orders</div>
+      <div class="card-grid" id="dash-workorders"></div>
+
+      <div class="section-heading" style="margin-top:24px;">Earnings</div>
+      <div class="earnings-summary">
+        <div class="earn-card pink">
+          <div class="earn-icon">💰</div>
+          <div class="earn-val" id="earnings-total">$0.00</div>
+          <div class="earn-lbl">Total Earnings</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-workorders">
+      <div class="panel-header">
+        <h2>Work Orders</h2>
+      </div>
+      <div class="card-grid" id="workorders-list"></div>
+    </section>
+
+    <section class="panel" id="panel-documents">
+      <div class="panel-header">
+        <h2>Documents</h2>
+      </div>
+      <div class="docs-grid">
+        <div class="card">
+          <div class="doc-card-title">W-9</div>
+          <div id="doc-w9-status" class="doc-status"></div>
+          <input type="file" id="doc-w9-file" class="form-input" />
+          <button class="btn-primary btn-full" onclick="uploadTechDoc('w9')">Upload W-9</button>
+        </div>
+        <div class="card">
+          <div class="doc-card-title">Government ID</div>
+          <div id="doc-id-status" class="doc-status"></div>
+          <input type="file" id="doc-id-file" class="form-input" />
+          <button class="btn-primary btn-full" onclick="uploadTechDoc('id')">Upload ID</button>
+        </div>
+        <div class="card">
+          <div class="doc-card-title">Certifications</div>
+          <div id="doc-certs-status" class="doc-status"></div>
+          <input type="file" id="doc-certs-file" class="form-input" />
+          <button class="btn-primary btn-full" onclick="uploadTechDoc('certs')">Upload Certs</button>
+        </div>
+        <div class="card">
+          <div class="doc-card-title">Insurance</div>
+          <div id="doc-insurance-status" class="doc-status"></div>
+          <input type="file" id="doc-insurance-file" class="form-input" />
+          <button class="btn-primary btn-full" onclick="uploadTechDoc('insurance')">Upload Insurance</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-chat">
+      <div class="panel-header">
+        <h2>Chat</h2>
+      </div>
+      <div class="chat-wrapper">
+        <div class="chat-messages"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" class="chat-input" placeholder="Type a message..." />
+          <button class="btn-primary" onclick="sendChatMessage()">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-availability">
+      <div class="panel-header">
+        <h2>Availability</h2>
+      </div>
+      <div class="availability-grid"></div>
+    </section>
+
+    <section class="panel" id="panel-timesheet">
+      <div class="panel-header">
+        <h2>Timesheet</h2>
+      </div>
+      <div class="card-actions" style="margin-bottom:12px;">
+        <button class="btn-sm btn-success" onclick="clockIn()">Clock In</button>
+      </div>
+      <div class="timesheet-list"></div>
+    </section>
+  </main>
+
+  <script src="/technician.js"></script>
+</body>
+</html>
