@@ -1,1 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Job Photos</title>
+  <link rel="stylesheet" href="technician.css">
+
+  <style>
+    .preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .preview img {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- PHOTOS PANEL -->
+  <div class="glass">
+    <h1 class="accent">Upload Photos</h1>
+    <div class="gold-line"></div>
+
+    <p><b>Job:</b> <span id="jobTitle">Loading...</span></p>
+    <p><b>Address:</b> <span id="jobAddress">Loading...</span></p>
+
+    <div style="margin-top: 20px;">
+      <label><b>Select Photos:</b></label>
+      <input type="file" id="photoInput" accept="image/*" multiple>
+    </div>
+
+    <div class="preview" id="previewContainer"></div>
+
+    <button id="uploadBtn" style="margin-top: 20px;">Upload Photos</button>
+    <button id="nextBtn" style="margin-top: 10px;">Continue to Close Job</button>
+  </div>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- TECHNICIAN LOGIC -->
+  <script src="technician.js"></script>
+
+  <!-- PAGE-SPECIFIC LOGIC -->
+  <script>
+    let selectedFiles = [];
+
+    async function loadJobPhotos() {
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get("id");
+
+      if (!jobId) {
+        alert("Missing job ID");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const techId = session.user.id;
+
+      // Fetch job
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (!job) {
+        alert("Job not found");
+        return;
+      }
+
+      // Fill UI
+      document.getElementById("jobTitle").innerText = job.title;
+      document.getElementById("jobAddress").innerText = job.address;
+
+      setupPhotoInput();
+      setupUploadButton(jobId, techId);
+      setupNextButton(jobId);
+    }
+
+    function setupPhotoInput() {
+      const input = document.getElementById("photoInput");
+      const preview = document.getElementById("previewContainer");
+
+      input.onchange = () => {
+        selectedFiles = Array.from(input.files);
+        preview.innerHTML = "";
+
+        selectedFiles.forEach(file => {
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        });
+      };
+    }
+
+    function setupUploadButton(jobId, techId) {
+      document.getElementById("uploadBtn").onclick = async () => {
+        if (selectedFiles.length === 0) {
+          alert("Please select at least one photo.");
+          return;
+        }
+
+        for (const file of selectedFiles) {
+          const filePath = `job_${jobId}/${Date.now()}_${file.name}`;
+
+          // Upload to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from("job-photos")
+            .upload(filePath, file);
+
+          if (uploadError) {
+            alert("Upload failed: " + uploadError.message);
+            return;
+          }
+
+          // Save metadata to DB
+          await supabase
+            .from("job_photos")
+            .insert({
+              job_id: jobId,
+              tech_id: techId,
+              file_path: filePath,
+              uploaded_at: new Date().toISOString()
+            });
+        }
+
+        alert("Photos uploaded successfully.");
+      };
+    }
+
+    function setupNextButton(jobId) {
+      document.getElementById("nextBtn").onclick = () => {
+        window.location.href = "close-job.html?id=" + jobId;
+      };
+    }
+
+    loadJobPhotos();
+  </script>
+
+</body>
+</html>
 
