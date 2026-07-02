@@ -1,8 +1,13 @@
 
 // ── SUPABASE INIT ─────────────────────────────────────────
+// ── SUPABASE INIT ─────────────────────────────────────────
 const supabaseUrl = 'https://iazvpykfdckpffhakncd.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez30isOszxP0XOIyndpJq2jwqE90eY649bA';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+if (!window._supabaseClient) {
+  window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+}
+const supabase = window._supabaseClient;
+
 
 let currentUser = null;
 let currentTechnician = null;
