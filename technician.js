@@ -5,8 +5,6 @@ if (!window._supabaseClient) {
   window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 }
 let supabase = window._supabaseClient;
-let currentUser = null;
-let currentTechnician = null;
 
 // ── CORE INIT ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
