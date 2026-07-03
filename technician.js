@@ -1,5 +1,3 @@
-
-// ── SUPABASE INIT ─────────────────────────────────────────
 // ── SUPABASE INIT ─────────────────────────────────────────
 const supabaseUrl = 'https://iazvpykfdckpffhakncd.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
