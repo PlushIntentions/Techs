@@ -4,9 +4,7 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 if (!window._supabaseClient) {
   window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 }
-const supabase = window._supabaseClient;
-
-
+let supabase = window._supabaseClient;
 let currentUser = null;
 let currentTechnician = null;
 
