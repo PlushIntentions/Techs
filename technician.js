@@ -1,6 +1,6 @@
 // ── SUPABASE INIT ─────────────────────────────────────────
 const supabaseUrl = 'https://iazvpykfdckpffhakncd.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez30isOszxP0XOIyndpJq2jwqE90eY649bA';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez30is[...]
 if (!window._supabaseClient) {
   window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 }
@@ -52,7 +52,6 @@ async function initTechApp() {
 async function loadAllPanels() {
   await Promise.all([
     loadDashboard(),
-    loadWorkOrders(),
     loadTechDocuments(),
     loadChatMessages(),
     loadAvailability(),
