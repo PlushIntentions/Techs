@@ -1,5 +1,5 @@
 const supabaseUrl = 'https://iazvpykfdckpffhakncd.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez30isOszxP0XOIyndpJq2jwqE90eY649bA';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez3[...]
 if (!window._supabaseClient) {
   window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 }
@@ -37,6 +37,7 @@ async function initTechApp() {
 
   if (techErr || !tech) {
     showToast('Technician record not found');
+    showLoader(false);
     return;
   }
 
@@ -44,18 +45,22 @@ async function initTechApp() {
 
   const emailEl = document.querySelector('.signed-in-email');
   if (emailEl) emailEl.textContent = currentUser.email || '';
-
-  showLoader(false);
 }
 
 async function loadAllPanels() {
-  await Promise.all([
-    loadDashboard(),
-    loadTechDocuments(),
-    loadChatMessages(),
-    loadAvailability(),
-    loadTimesheet()
-  ]);
+  try {
+    await Promise.all([
+      loadDashboard().catch(err => console.error('Dashboard load error:', err)),
+      loadTechDocuments().catch(err => console.error('Documents load error:', err)),
+      loadChatMessages().catch(err => console.error('Chat load error:', err)),
+      loadAvailability().catch(err => console.error('Availability load error:', err)),
+      loadTimesheet().catch(err => console.error('Timesheet load error:', err))
+    ]);
+  } catch (err) {
+    console.error('Panel load error:', err);
+  } finally {
+    showLoader(false);
+  }
 }
 
 // ── UI HELPERS ────────────────────────────────────────────
@@ -129,7 +134,6 @@ function wireRefresh() {
   btn.addEventListener('click', async () => {
     showLoader(true);
     await loadAllPanels();
-    showLoader(false);
     showToast('Refreshed');
   });
 }
@@ -258,24 +262,27 @@ function updateStats(workOrders) {
 
 // ── DOCUMENTS ─────────────────────────────────────────────
 async function loadTechDocuments() {
-  const { data, error } = await supabase
-    .from('technician_documents')
-    .select('*')
-    .eq('technician_id', currentTechnician.id)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('technician_documents')
+      .select('*')
+      .eq('technician_id', currentTechnician.id)
+      .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') {
-    console.error(error);
-    showToast('Failed to load documents');
-    return;
+    if (error) {
+      console.error('Documents error:', error);
+      return;
+    }
+
+    if (!data) return;
+
+    setDocStatus('w9', data.w9_url);
+    setDocStatus('id', data.id_url);
+    setDocStatus('certs', data.certs_url);
+    setDocStatus('insurance', data.insurance_url);
+  } catch (err) {
+    console.error('loadTechDocuments error:', err);
   }
-
-  if (!data) return;
-
-  setDocStatus('w9', data.w9_url);
-  setDocStatus('id', data.id_url);
-  setDocStatus('certs', data.certs_url);
-  setDocStatus('insurance', data.insurance_url);
 }
 
 function setDocStatus(type, url) {
@@ -342,19 +349,22 @@ async function uploadTechDoc(type) {
 
 // ── CHAT ──────────────────────────────────────────────────
 async function loadChatMessages() {
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select('*')
-    .eq('technician_id', currentTechnician.id)
-    .order('created_at', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('technician_id', currentTechnician.id)
+      .order('created_at', { ascending: true });
 
-  if (error) {
-    console.error(error);
-    showToast('Failed to load chat');
-    return;
+    if (error) {
+      console.error('Chat error:', error);
+      return;
+    }
+
+    renderChat(data || []);
+  } catch (err) {
+    console.error('loadChatMessages error:', err);
   }
-
-  renderChat(data || []);
 }
 
 function renderChat(list) {
@@ -420,19 +430,22 @@ function subscribeChat() {
 
 // ── AVAILABILITY ──────────────────────────────────────────
 async function loadAvailability() {
-  const { data, error } = await supabase
-    .from('technician_availability')
-    .select('*')
-    .eq('technician_id', currentTechnician.id)
-    .order('day_of_week', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('technician_availability')
+      .select('*')
+      .eq('technician_id', currentTechnician.id)
+      .order('day_of_week', { ascending: true });
 
-  if (error) {
-    console.error(error);
-    showToast('Failed to load availability');
-    return;
+    if (error) {
+      console.error('Availability error:', error);
+      return;
+    }
+
+    renderAvailability(data || []);
+  } catch (err) {
+    console.error('loadAvailability error:', err);
   }
-
-  renderAvailability(data || []);
 }
 
 function renderAvailability(list) {
@@ -463,20 +476,23 @@ function renderAvailability(list) {
 
 // ── TIMESHEET ─────────────────────────────────────────────
 async function loadTimesheet() {
-  const { data, error } = await supabase
-    .from('timesheet')
-    .select('*')
-    .eq('technician_id', currentTechnician.id)
-    .order('clock_in', { ascending: false })
-    .limit(30);
+  try {
+    const { data, error } = await supabase
+      .from('timesheet')
+      .select('*')
+      .eq('technician_id', currentTechnician.id)
+      .order('clock_in', { ascending: false })
+      .limit(30);
 
-  if (error) {
-    console.error(error);
-    showToast('Failed to load timesheet');
-    return;
+    if (error) {
+      console.error('Timesheet error:', error);
+      return;
+    }
+
+    renderTimesheet(data || []);
+  } catch (err) {
+    console.error('loadTimesheet error:', err);
   }
-
-  renderTimesheet(data || []);
 }
 
 function renderTimesheet(list) {
