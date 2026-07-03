@@ -1,5 +1,6 @@
+// ── SUPABASE INIT ─────────────────────────────────────────
 const supabaseUrl = 'https://iazvpykfdckpffhakncd.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez30isOszxP0XOIyndpJq2jwqE90eY649bA';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhenZweWtmZGNrcGZmaGFrbmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzA0MTEsImV4cCI6MjA5NTg0NjQxMX0.OOXhS1zLez3[...]
 if (!window._supabaseClient) {
   window._supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 }
@@ -9,6 +10,7 @@ let currentTechnician = null;
 
 // ── CORE INIT ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('[INIT] DOMContentLoaded fired');
   wireNav();
   wireSidebar();
   wireRefresh();
@@ -19,15 +21,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function initTechApp() {
+  console.log('[INIT] initTechApp starting');
   showLoader(true);
 
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error || !session) {
+    console.error('[INIT] No session:', error);
     window.location.href = '/login.html';
     return;
   }
 
   currentUser = session.user;
+  console.log('[INIT] User loaded:', currentUser.email);
 
   const { data: tech, error: techErr } = await supabase
     .from('technicians')
@@ -36,29 +41,44 @@ async function initTechApp() {
     .single();
 
   if (techErr || !tech) {
+    console.error('[INIT] Technician error:', techErr);
     showToast('Technician record not found');
     showLoader(false);
     return;
   }
 
   currentTechnician = tech;
+  console.log('[INIT] Technician loaded:', currentTechnician.id);
 
   const emailEl = document.querySelector('.signed-in-email');
   if (emailEl) emailEl.textContent = currentUser.email || '';
 }
 
 async function loadAllPanels() {
+  console.log('[PANELS] loadAllPanels starting');
+  showLoader(true);
+
+  const timeout = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Panel load timeout after 15s')), 15000)
+  );
+
   try {
-    await Promise.all([
-      loadDashboard().catch(err => console.error('Dashboard load error:', err)),
-      loadTechDocuments().catch(err => console.error('Documents load error:', err)),
-      loadChatMessages().catch(err => console.error('Chat load error:', err)),
-      loadAvailability().catch(err => console.error('Availability load error:', err)),
-      loadTimesheet().catch(err => console.error('Timesheet load error:', err))
+    await Promise.race([
+      Promise.all([
+        loadDashboard().catch(err => console.error('[PANELS] Dashboard error:', err)),
+        loadTechDocuments().catch(err => console.error('[PANELS] Documents error:', err)),
+        loadChatMessages().catch(err => console.error('[PANELS] Chat error:', err)),
+        loadAvailability().catch(err => console.error('[PANELS] Availability error:', err)),
+        loadTimesheet().catch(err => console.error('[PANELS] Timesheet error:', err))
+      ]),
+      timeout
     ]);
+    console.log('[PANELS] All panels loaded successfully');
   } catch (err) {
-    console.error('Panel load error:', err);
+    console.error('[PANELS] Error:', err);
+    showToast('Error loading data');
   } finally {
+    console.log('[PANELS] Hiding loader');
     showLoader(false);
   }
 }
@@ -66,7 +86,11 @@ async function loadAllPanels() {
 // ── UI HELPERS ────────────────────────────────────────────
 function showLoader(show) {
   const el = document.getElementById('loader');
-  if (!el) return;
+  if (!el) {
+    console.warn('[UI] Loader element not found');
+    return;
+  }
+  console.log('[UI] Loader:', show ? 'SHOW' : 'HIDE');
   el.classList.toggle('hidden', !show);
 }
 
@@ -145,27 +169,37 @@ async function signOut() {
 
 // ── DASHBOARD / WORK ORDERS ───────────────────────────────
 async function loadDashboard() {
+  console.log('[DASHBOARD] Loading');
   try {
-    const { data: workOrders } = await supabase
+    const { data: workOrders, error: woErr } = await supabase
       .from('work_orders')
       .select('*')
       .eq('assigned_tech_id', currentTechnician.id)
       .order('created_at', { ascending: false })
       .limit(6);
 
-    renderDashboardWorkOrders(workOrders || []);
-    updateStats(workOrders || []);
+    if (woErr) {
+      console.error('[DASHBOARD] Work orders error:', woErr);
+    } else {
+      console.log('[DASHBOARD] Work orders loaded:', workOrders?.length);
+      renderDashboardWorkOrders(workOrders || []);
+      updateStats(workOrders || []);
+    }
 
-    const { data: earnings } = await supabase
+    const { data: earnings, error: earnErr } = await supabase
       .from('earnings')
       .select('amount')
       .eq('technician_id', currentTechnician.id);
 
-    const total = (earnings || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const el = document.getElementById('earnings-total');
-    if (el) el.textContent = `$${total.toFixed(2)}`;
+    if (earnErr) {
+      console.error('[DASHBOARD] Earnings error:', earnErr);
+    } else {
+      const total = (earnings || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      const el = document.getElementById('earnings-total');
+      if (el) el.textContent = `$${total.toFixed(2)}`;
+    }
   } catch (err) {
-    console.error(err);
+    console.error('[DASHBOARD] Exception:', err);
     showToast('Failed to load dashboard');
   }
 }
@@ -203,46 +237,52 @@ function renderDashboardWorkOrders(list) {
 }
 
 async function loadWorkOrders() {
-  const { data, error } = await supabase
-    .from('work_orders')
-    .select('*')
-    .eq('assigned_tech_id', currentTechnician.id)
-    .order('created_at', { ascending: false });
+  console.log('[WORKORDERS] Loading');
+  try {
+    const { data, error } = await supabase
+      .from('work_orders')
+      .select('*')
+      .eq('assigned_tech_id', currentTechnician.id)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error(error);
-    showToast('Failed to load work orders');
-    return;
-  }
+    if (error) {
+      console.error('[WORKORDERS] Error:', error);
+      showToast('Failed to load work orders');
+      return;
+    }
 
-  const container = document.getElementById('workorders-list');
-  if (!container) return;
+    console.log('[WORKORDERS] Loaded:', data?.length);
+    const container = document.getElementById('workorders-list');
+    if (!container) return;
 
-  if (!data.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <p>No work orders assigned.</p>
-      </div>`;
-    return;
-  }
+    if (!data.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>No work orders assigned.</p>
+        </div>`;
+      return;
+    }
 
-  container.innerHTML = data.map(wo => `
-    <div class="card">
-      <div class="card-top">
-        <div>
-          <div class="card-title">${wo.title}</div>
-          <div class="card-sub">${wo.job_address || ''}</div>
+    container.innerHTML = data.map(wo => `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-title">${wo.title}</div>
+            <div class="card-sub">${wo.job_address || ''}</div>
+          </div>
+          <span class="badge badge-${(wo.status || 'pending').toLowerCase()}">
+            ${(wo.status || 'pending').replace('_',' ')}
+          </span>
         </div>
-        <span class="badge badge-${(wo.status || 'pending').toLowerCase()}">
-          ${(wo.status || 'pending').replace('_',' ')}
-        </span>
+        <div class="card-body">
+          <span><strong>WO #</strong> ${wo.wo_number}</span>
+          <span><strong>Scheduled</strong> ${wo.scheduled_date || 'TBD'} ${wo.scheduled_time || ''}</span>
+        </div>
       </div>
-      <div class="card-body">
-        <span><strong>WO #</strong> ${wo.wo_number}</span>
-        <span><strong>Scheduled</strong> ${wo.scheduled_date || 'TBD'} ${wo.scheduled_time || ''}</span>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  } catch (err) {
+    console.error('[WORKORDERS] Exception:', err);
+  }
 }
 
 function updateStats(workOrders) {
@@ -262,6 +302,7 @@ function updateStats(workOrders) {
 
 // ── DOCUMENTS ─────────────────────────────────────────────
 async function loadTechDocuments() {
+  console.log('[DOCUMENTS] Loading');
   try {
     const { data, error } = await supabase
       .from('technician_documents')
@@ -270,18 +311,22 @@ async function loadTechDocuments() {
       .maybeSingle();
 
     if (error) {
-      console.error('Documents error:', error);
+      console.error('[DOCUMENTS] Error:', error);
       return;
     }
 
-    if (!data) return;
+    if (!data) {
+      console.log('[DOCUMENTS] No document record found');
+      return;
+    }
 
+    console.log('[DOCUMENTS] Loaded');
     setDocStatus('w9', data.w9_url);
     setDocStatus('id', data.id_url);
     setDocStatus('certs', data.certs_url);
     setDocStatus('insurance', data.insurance_url);
   } catch (err) {
-    console.error('loadTechDocuments error:', err);
+    console.error('[DOCUMENTS] Exception:', err);
   }
 }
 
@@ -349,6 +394,7 @@ async function uploadTechDoc(type) {
 
 // ── CHAT ──────────────────────────────────────────────────
 async function loadChatMessages() {
+  console.log('[CHAT] Loading messages');
   try {
     const { data, error } = await supabase
       .from('chat_messages')
@@ -357,13 +403,14 @@ async function loadChatMessages() {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Chat error:', error);
+      console.error('[CHAT] Error:', error);
       return;
     }
 
+    console.log('[CHAT] Loaded:', data?.length);
     renderChat(data || []);
   } catch (err) {
-    console.error('loadChatMessages error:', err);
+    console.error('[CHAT] Exception:', err);
   }
 }
 
@@ -430,6 +477,7 @@ function subscribeChat() {
 
 // ── AVAILABILITY ──────────────────────────────────────────
 async function loadAvailability() {
+  console.log('[AVAILABILITY] Loading');
   try {
     const { data, error } = await supabase
       .from('technician_availability')
@@ -438,13 +486,14 @@ async function loadAvailability() {
       .order('day_of_week', { ascending: true });
 
     if (error) {
-      console.error('Availability error:', error);
+      console.error('[AVAILABILITY] Error:', error);
       return;
     }
 
+    console.log('[AVAILABILITY] Loaded:', data?.length);
     renderAvailability(data || []);
   } catch (err) {
-    console.error('loadAvailability error:', err);
+    console.error('[AVAILABILITY] Exception:', err);
   }
 }
 
@@ -476,6 +525,7 @@ function renderAvailability(list) {
 
 // ── TIMESHEET ─────────────────────────────────────────────
 async function loadTimesheet() {
+  console.log('[TIMESHEET] Loading');
   try {
     const { data, error } = await supabase
       .from('timesheet')
@@ -485,13 +535,14 @@ async function loadTimesheet() {
       .limit(30);
 
     if (error) {
-      console.error('Timesheet error:', error);
+      console.error('[TIMESHEET] Error:', error);
       return;
     }
 
+    console.log('[TIMESHEET] Loaded:', data?.length);
     renderTimesheet(data || []);
   } catch (err) {
-    console.error('loadTimesheet error:', err);
+    console.error('[TIMESHEET] Exception:', err);
   }
 }
 
