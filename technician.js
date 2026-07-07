@@ -1,4 +1,4 @@
-
+console.log("technician.js loaded");
 
 // ── CORE INIT ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
